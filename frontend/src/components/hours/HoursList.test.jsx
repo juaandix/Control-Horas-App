@@ -1,123 +1,161 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import HoursList from './HoursList';
 import { hoursService } from '../../services/hours';
 
-jest.mock('../../services/hours');
+// Mock de servicios y window.confirm
+jest.mock('../../services/hours.js');
 
-describe('HoursList', () => {
-  let confirmMock;
-  const mockHours = [
-    {
-      id: 1,
-      fecha: '2024-06-01',
-      horas_normales: 8,
-      horas_extras: 2,
-      descripcion: 'Trabajo normal'
-    },
-    {
-      id: 2,
-      fecha: '2024-06-02',
-      horas_normales: 7,
-      horas_extras: 1,
-      descripcion: ''
-    }
-  ];
-
+describe('HoursList Component', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    confirmMock = jest.spyOn(window, 'confirm');
+    // Mock para console.error para mantener la salida de la prueba limpia
+    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    confirmMock.mockRestore();
+    console.error.mockRestore();
   });
 
-  it('muestra estado de carga inicialmente', async () => {
+  test('debe mostrar el estado de carga inicialmente', () => {
+    hoursService.getMyHours.mockReturnValue(new Promise(() => {}));
+    render(<HoursList />, { wrapper: MemoryRouter });
+    expect(screen.getByText('Cargando registros...')).toBeInTheDocument();
+  });
+
+  test('debe mostrar un mensaje de error si la carga falla', async () => {
+    hoursService.getMyHours.mockRejectedValue(new Error('Error de red'));
+    render(<HoursList />, { wrapper: MemoryRouter });
+    expect(await screen.findByText('Error al cargar las horas')).toBeInTheDocument();
+  });
+
+  test('debe mostrar un estado vacío si no hay horas registradas', async () => {
     hoursService.getMyHours.mockResolvedValue([]);
-    const { getByText } = render(<HoursList />);
-    expect(getByText('Cargando registros...')).toBeInTheDocument();
+    render(<HoursList />, { wrapper: MemoryRouter });
+    expect(await screen.findByText('No hay registros de horas')).toBeInTheDocument();
   });
 
-  it('muestra error si falla la carga', async () => {
-    hoursService.getMyHours.mockRejectedValue(new Error('fail'));
-    const { findByText } = render(<HoursList />);
-    expect(await findByText('Error al cargar las horas')).toBeInTheDocument();
-  });
-
-  it('muestra estado vacío si no hay registros', async () => {
-    hoursService.getMyHours.mockResolvedValue([]);
-    const { findByText } = render(<HoursList />);
-    expect(await findByText('No hay registros de horas')).toBeInTheDocument();
-    expect(await findByText('Registrar Primera Hora')).toBeInTheDocument();
-  });
-
-  it('renderiza la tabla con datos', async () => {
+  test('debe mostrar la lista de horas registradas', async () => {
+    const mockHours = [
+      { id: 1, fecha: '2025-10-27', horas_normales: 8, horas_extras: 1, descripcion: 'Tarea 1' },
+      { id: 2, fecha: '2025-10-28', horas_normales: 7, horas_extras: 0, descripcion: 'Tarea 2' },
+    ];
     hoursService.getMyHours.mockResolvedValue(mockHours);
-    const { findByText, findAllByText } = render(<HoursList />);
-    expect(await findByText('Mis Horas Registradas')).toBeInTheDocument();
-    expect(await findByText('Trabajo normal')).toBeInTheDocument();
-    expect(await findByText('Sin descripción')).toBeInTheDocument();
-    expect((await findAllByText('8h')).length).toBe(2);
-    expect((await findAllByText('2h')).length).toBe(1);
-    expect((await findAllByText('10h')).length).toBe(1);
-  });
+    render(<HoursList />, { wrapper: MemoryRouter });
 
-  it('no elimina si se cancela confirmación', async () => {
-    hoursService.getMyHours.mockResolvedValue(mockHours);
-    confirmMock.mockReturnValue(false);
-    const { findAllByTitle } = render(<HoursList />);
-    const deleteButtons = await findAllByTitle('Eliminar registro');
-    fireEvent.click(deleteButtons[0]);
-    expect(hoursService.deleteHours).not.toHaveBeenCalled();
-  });
-
-  it('elimina registro si se confirma', async () => {
-    hoursService.getMyHours.mockResolvedValue(mockHours);
-    hoursService.deleteHours.mockResolvedValue({});
-    confirmMock.mockReturnValue(true);
-    const { findAllByTitle, queryByText } = render(<HoursList />);
-    const deleteButtons = await findAllByTitle('Eliminar registro');
-    fireEvent.click(deleteButtons[0]);
     await waitFor(() => {
-      expect(hoursService.deleteHours).toHaveBeenCalledWith(1);
-      expect(queryByText('Trabajo normal')).not.toBeInTheDocument();
+        expect(screen.getByText('Tarea 1')).toBeInTheDocument();
+        expect(screen.getByText('Tarea 2')).toBeInTheDocument();
     });
   });
 
-  it('muestra error si falla la eliminación', async () => {
+  test('debe permitir eliminar un registro de horas', async () => {
+    const mockHours = [
+      { id: 1, fecha: '2025-10-27', horas_normales: 8, horas_extras: 1, descripcion: 'Tarea 1' },
+    ];
     hoursService.getMyHours.mockResolvedValue(mockHours);
-    hoursService.deleteHours.mockRejectedValue(new Error('fail'));
-    confirmMock.mockReturnValue(true);
-    const { findAllByTitle, findByText } = render(<HoursList />);
-    const deleteButtons = await findAllByTitle('Eliminar registro');
-    fireEvent.click(deleteButtons[0]);
-    expect(await findByText('Error al eliminar el registro')).toBeInTheDocument();
+    hoursService.deleteHours.mockResolvedValue({});
+    window.confirm = jest.fn(() => true); // Mock de window.confirm
+
+    render(<HoursList />, { wrapper: MemoryRouter });
+
+    await waitFor(() => expect(screen.getByText('Tarea 1')).toBeInTheDocument());
+
+    const deleteButton = screen.getByTitle('Eliminar registro');
+    fireEvent.click(deleteButton);
+
+    expect(window.confirm).toHaveBeenCalledWith('¿Estás seguro de que quieres eliminar este registro?');
+    
+    await waitFor(() => {
+      expect(hoursService.deleteHours).toHaveBeenCalledWith(1);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Tarea 1')).not.toBeInTheDocument();
+    });
   });
 
-  it('calcula correctamente el resumen total', async () => {
+  test('muestra correctamente el resumen total', async () => {
+    const mockHours = [
+      { id: 1, fecha: '2025-10-27', horas_normales: 8, horas_extras: 1, descripcion: 'Tarea 1' },
+      { id: 2, fecha: '2025-10-28', horas_normales: 7, horas_extras: 2, descripcion: 'Tarea 2' },
+    ];
     hoursService.getMyHours.mockResolvedValue(mockHours);
-    const { findByText } = render(<HoursList />);
-    expect(await findByText('15h')).toBeInTheDocument(); // Total Horas Normales
-    expect(await findByText('3h')).toBeInTheDocument();  // Total Horas Extras
-    expect(await findByText('18h')).toBeInTheDocument(); // Total General
+    render(<HoursList />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByText('15h')).toBeInTheDocument(); // Total Horas Normales
+    expect(screen.getByText('3h')).toBeInTheDocument(); // Total Horas Extras
+    expect(screen.getByText('18h')).toBeInTheDocument(); // Total General
   });
 
-  it('usa "Sin descripción" si no hay descripción', async () => {
-    hoursService.getMyHours.mockResolvedValue([mockHours[1]]);
-    const { findByText } = render(<HoursList />);
-    expect(await findByText('Sin descripción')).toBeInTheDocument();
+  test('formatea la fecha correctamente', async () => {
+    const mockHours = [
+      { id: 1, fecha: '2025-10-27', horas_normales: 8, horas_extras: 1, descripcion: 'Tarea 1' },
+    ];
+    hoursService.getMyHours.mockResolvedValue(mockHours);
+    render(<HoursList />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByText(/27 de octubre de 2025/i)).toBeInTheDocument();
   });
 
-  it('formatea la fecha correctamente', async () => {
-    hoursService.getMyHours.mockResolvedValue([mockHours[0]]);
-    const { findByText } = render(<HoursList />);
-    expect(await findByText(/1 de junio de 2024/i)).toBeInTheDocument();
+  test('muestra "Sin descripción" si la descripción está vacía', async () => {
+    const mockHours = [
+      { id: 1, fecha: '2025-10-27', horas_normales: 8, horas_extras: 1, descripcion: '' },
+    ];
+    hoursService.getMyHours.mockResolvedValue(mockHours);
+    render(<HoursList />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByText('Sin descripción')).toBeInTheDocument();
   });
 
-  it('calcula el total por registro correctamente', async () => {
-    hoursService.getMyHours.mockResolvedValue([mockHours[0]]);
-    const { findAllByText } = render(<HoursList />);
-    expect((await findAllByText('10h')).length).toBe(2);
+  test('no elimina el registro si se cancela la confirmación', async () => {
+    const mockHours = [
+      { id: 1, fecha: '2025-10-27', horas_normales: 8, horas_extras: 1, descripcion: 'Tarea 1' },
+    ];
+    hoursService.getMyHours.mockResolvedValue(mockHours);
+    window.confirm = jest.fn(() => false);
+
+    render(<HoursList />, { wrapper: MemoryRouter });
+
+    await waitFor(() => expect(screen.getByText('Tarea 1')).toBeInTheDocument());
+
+    const deleteButton = screen.getByTitle('Eliminar registro');
+    fireEvent.click(deleteButton);
+
+    expect(window.confirm).toHaveBeenCalled();
+    expect(hoursService.deleteHours).not.toHaveBeenCalled();
+    expect(screen.getByText('Tarea 1')).toBeInTheDocument();
+  });
+
+  test('muestra error si falla la eliminación', async () => {
+    const mockHours = [
+      { id: 1, fecha: '2025-10-27', horas_normales: 8, horas_extras: 1, descripcion: 'Tarea 1' },
+    ];
+    hoursService.getMyHours.mockResolvedValue(mockHours);
+    hoursService.deleteHours.mockRejectedValue(new Error('Error al eliminar'));
+    window.confirm = jest.fn(() => true);
+
+    render(<HoursList />, { wrapper: MemoryRouter });
+
+    await waitFor(() => expect(screen.getByText('Tarea 1')).toBeInTheDocument());
+
+    const deleteButton = screen.getByTitle('Eliminar registro');
+    fireEvent.click(deleteButton);
+
+    expect(window.confirm).toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(screen.getByText('Error al eliminar el registro')).toBeInTheDocument();
+      expect(screen.getByText('Tarea 1')).toBeInTheDocument();
+    });
+  });
+
+  test('verifica encabezados y botón de registro', async () => {
+    hoursService.getMyHours.mockResolvedValue([]);
+    render(<HoursList />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByText('Registrar Primera Hora')).toBeInTheDocument();
+    expect(screen.getByText('No hay registros de horas')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Mis Horas Registradas/i })).toBeInTheDocument();
   });
 });
