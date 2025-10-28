@@ -35,9 +35,10 @@ const Login = () => {
         
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Email:</label>
+            <label htmlFor="email" style={styles.label}>Email:</label>
             <input
               type="email"
+              id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -47,9 +48,10 @@ const Login = () => {
           </div>
           
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Contraseña:</label>
+            <label htmlFor="password" style={styles.label}>Contraseña:</label>
             <input
               type="password"
+              id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

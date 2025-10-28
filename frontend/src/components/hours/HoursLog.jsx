@@ -74,9 +74,10 @@ const HoursLog = () => {
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Fecha:</label>
+            <label htmlFor="fecha" style={styles.label}>Fecha:</label>
             <input
               type="date"
+              id="fecha"
               name="fecha"
               value={formData.fecha}
               onChange={handleChange}
@@ -87,9 +88,10 @@ const HoursLog = () => {
 
           <div style={styles.inputRow}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Horas Normales:</label>
+              <label htmlFor="horas_normales" style={styles.label}>Horas Normales:</label>
               <input
                 type="number"
+                id="horas_normales"
                 name="horas_normales"
                 value={formData.horas_normales}
                 onChange={handleChange}
@@ -102,9 +104,10 @@ const HoursLog = () => {
             </div>
 
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Horas Extras:</label>
+              <label htmlFor="horas_extras" style={styles.label}>Horas Extras:</label>
               <input
                 type="number"
+                id="horas_extras"
                 name="horas_extras"
                 value={formData.horas_extras}
                 onChange={handleChange}
@@ -122,8 +125,9 @@ const HoursLog = () => {
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Descripción:</label>
+            <label htmlFor="descripcion" style={styles.label}>Descripción:</label>
             <textarea
+              id="descripcion"
               name="descripcion"
               value={formData.descripcion}
               onChange={handleChange}
